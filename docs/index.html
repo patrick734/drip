@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Drip</title>
+<meta name="description" content="Stream BOT or any token by the second on BOT Chain. Recipients withdraw as it flows; either side can stop it.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/ethers@6.13.4/dist/ethers.umd.min.js"></script>
+<style>
+:root{
+  --bg:#F4F3FA; --card:#FFFFFF; --ink:#1E1B4D; --muted:#6A6890; --rule:#DCDAEC; --soft:#ECEBF7;
+  --aqua:#0B9DBE; --aqua-ink:#FFFFFF; --flow:#0B9DBE; --warn:#C0392B;
+  --disp:"Unbounded",system-ui,sans-serif; --body:"DM Sans",system-ui,sans-serif; --num:"JetBrains Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme:dark){:root{--bg:#121031;--card:#1B1844;--ink:#ECEBFA;--muted:#A3A0CC;--rule:#2E2A63;--soft:#24205A;--aqua:#34C6E6;--aqua-ink:#05202A;--flow:#34C6E6;--warn:#F07A6A}}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.55 var(--body);-webkit-font-smoothing:antialiased}
+a{color:inherit}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--aqua);outline-offset:2px}
+
+.top{display:flex;align-items:center;gap:14px;padding:14px 24px;flex-wrap:wrap}
+.logo{display:flex;align-items:center;gap:9px;margin-right:auto;font:800 22px/1 var(--disp);letter-spacing:-.02em}
+.who{font-size:14px;color:var(--muted)} .who b{color:var(--ink);font-weight:700}
+.bad{color:var(--warn);font-weight:700}
+.btn{border:1.5px solid var(--ink);background:transparent;padding:8px 16px;border-radius:999px;cursor:pointer;font-weight:700;font-size:15px}
+.btn:hover{background:var(--ink);color:var(--bg)}
+.btn.go{background:var(--aqua);border-color:var(--aqua);color:var(--aqua-ink)}
+.btn.go:hover{filter:brightness(1.07);background:var(--aqua);color:var(--aqua-ink)}
+.btn.quiet{border-color:var(--rule)}
+.btn.warn{border-color:var(--warn);color:var(--warn)}
+.btn.warn:hover{background:var(--warn);color:#fff}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+
+.hero{max-width:1120px;margin:0 auto;padding:28px 24px 36px;display:grid;grid-template-columns:1fr 440px;gap:40px;align-items:start}
+@media (max-width:900px){.hero{grid-template-columns:1fr;padding:20px 16px 28px;gap:24px}.top{padding:12px 16px}}
+h1{font:800 clamp(40px,6.4vw,74px)/.98 var(--disp);letter-spacing:-.04em;margin:18px 0 16px}
+.lede{color:var(--muted);font-size:18px;max-width:46ch;margin:0 0 18px}
+.uses{display:flex;flex-wrap:wrap;gap:8px;margin:0;padding:0;list-style:none}
+.uses li{font-size:14px;padding:5px 12px;border-radius:999px;background:var(--soft)}
+
+.panel{background:var(--card);border:1px solid var(--rule);border-radius:18px;padding:22px}
+.panel h2{font:700 20px/1.2 var(--disp);margin:0 0 4px;letter-spacing:-.02em}
+label{display:block;font-size:14px;font-weight:700;margin:14px 0 6px}
+.field{width:100%;padding:10px 12px;border:1.5px solid var(--rule);border-radius:10px;background:var(--bg)}
+.field:focus{border-color:var(--ink);outline:none}
+.mono{font-family:var(--num);font-size:13.5px;overflow-wrap:anywhere;word-break:break-all}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.row3{display:grid;grid-template-columns:1fr 130px;gap:10px}
+.hint{font-size:13px;color:var(--muted);margin:8px 0 0}
+.preview{margin-top:16px;padding:12px 14px;border-radius:12px;background:var(--soft);font-size:14px}
+.preview b{font-family:var(--num);font-weight:700}
+.steps{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+.check{display:flex;gap:8px;align-items:center;margin-top:14px;font-size:14px;font-weight:500}
+.check input{width:auto}
+
+.list-wrap{max-width:1120px;margin:0 auto;padding:0 24px 72px}
+@media (max-width:900px){.list-wrap{padding:0 16px 56px}}
+.tabs{display:flex;gap:6px;margin:0 0 16px;flex-wrap:wrap}
+.tab{border:1.5px solid var(--rule);background:transparent;padding:6px 14px;border-radius:999px;cursor:pointer;font-size:14px;font-weight:700}
+.tab[aria-pressed=true]{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px}
+@media (max-width:420px){.grid{grid-template-columns:1fr}}
+
+/* stream card with live counter: the memorable element */
+.stream{background:var(--card);border:1px solid var(--rule);border-radius:18px;padding:20px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.dir{font-size:13px;color:var(--muted)} .dir b{color:var(--ink)}
+.memo{font-weight:700;font-size:17px;overflow-wrap:anywhere}
+.counter{font:700 clamp(26px,4.4vw,34px)/1 var(--num);letter-spacing:-.03em;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.counter small{font:500 14px var(--body);color:var(--muted);letter-spacing:0;margin-left:6px}
+.of{font-size:14px;color:var(--muted)}
+.bar{position:relative;height:6px;background:var(--soft);border-radius:999px;overflow:hidden}
+.bar i{position:absolute;inset:0 auto 0 0;background:var(--flow);border-radius:999px}
+.live .bar i{background:repeating-linear-gradient(90deg,var(--flow) 0 14px,color-mix(in srgb,var(--flow) 70%,transparent) 14px 20px);background-size:20px 100%}
+@media (prefers-reduced-motion:no-preference){.live .bar i{animation:flow 1s linear infinite}@keyframes flow{to{background-position:20px 0}}}
+.meta{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;color:var(--muted)}
+.meta b{color:var(--ink);font-weight:700}
+.badge{font-size:12px;font-weight:700;padding:2px 9px;border-radius:999px;background:var(--soft);color:var(--muted);align-self:flex-start}
+.badge.live{background:var(--aqua);color:var(--aqua-ink)}
+.acts{display:flex;gap:8px;flex-wrap:wrap}
+.empty{padding:40px 20px;text-align:center;color:var(--muted);border:1.5px dashed var(--rule);border-radius:18px}
+
+.foot{border-top:1px solid var(--rule);background:var(--card)}
+.foot-in{max-width:1120px;margin:0 auto;padding:28px 24px 36px;display:flex;flex-wrap:wrap;gap:20px 56px;align-items:center}
+@media (max-width:900px){.foot-in{padding:24px 16px 32px}}
+.foot-label{margin:0;font-size:13px;color:var(--muted)}
+.foot-name{margin:2px 0 0;font:800 24px/1 var(--disp);letter-spacing:-.02em}
+.foot-links{list-style:none;margin:0;padding:0;display:grid;gap:6px;font-size:15px}
+.foot-links a{font-weight:700;overflow-wrap:anywhere}
+
+dialog{border:1px solid var(--rule);border-radius:16px;background:var(--card);color:var(--ink);padding:22px;width:min(380px,calc(100% - 32px))}
+dialog::backdrop{background:rgba(10,8,30,.55)}
+dialog h2{font:700 20px/1.2 var(--disp);margin:0}
+.wallets{display:grid;gap:8px;margin:12px 0 6px}
+.wbtn{display:flex;align-items:center;gap:12px;width:100%;padding:11px 12px;border:1.5px solid var(--rule);border-radius:12px;background:var(--bg);cursor:pointer;font-weight:700;text-align:left}
+.wbtn:hover{border-color:var(--ink)}
+.wbtn img{border-radius:6px}
+.wicon{width:28px;height:28px;border-radius:6px;background:var(--rule);display:inline-block}
+
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:12px 18px;border-radius:12px;max-width:min(560px,calc(100% - 32px));font-size:15px;box-shadow:0 10px 30px rgba(0,0,0,.25);display:none;z-index:10}
+.toast.show{display:block}
+.toast a{color:var(--aqua);font-weight:700}
+@media (prefers-reduced-motion:no-preference){.toast.show{animation:up .2s ease-out}@keyframes up{from{opacity:0;transform:translate(-50%,8px)}}}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="logo">
+    <svg width="22" height="28" viewBox="0 0 22 28" aria-hidden="true"><path d="M11 1C11 1 2 12 2 18a9 9 0 0 0 18 0C20 12 11 1 11 1Z" fill="var(--aqua)"/><path d="M6.5 18.5a4.5 4.5 0 0 0 4.5 4.5" fill="none" stroke="var(--aqua-ink)" stroke-width="2" stroke-linecap="round"/></svg>
+    Drip
+  </div>
+  <span class="who" id="who">Not connected</span>
+  <button class="btn go" id="connect">Connect wallet</button>
+</header>
+
+<section class="hero">
+  <div>
+    <h1>Pay by the second.</h1>
+    <p class="lede">Send BOT or any token as a stream that flows to someone every second until an end date. They withdraw whenever they like. Either of you can stop it, and the unspent part goes straight back.</p>
+    <ul class="uses" aria-label="What people use streams for"><li>Salaries</li><li>Contractor retainers</li><li>Grants</li><li>Paying AI agents</li><li>Subscriptions</li></ul>
+  </div>
+
+  <form class="panel" id="newForm" aria-labelledby="newH">
+    <h2 id="newH">Start a stream</h2>
+    <label for="fTo">Recipient wallet</label>
+    <input class="field mono" id="fTo" placeholder="0x…" required autocomplete="off" spellcheck="false">
+    <div class="row">
+      <div><label for="fTok">Pay in</label>
+        <select class="field" id="fTok"><option value="native">BOT</option><option value="token">Another token…</option></select>
+      </div>
+      <div><label for="fAmt">Total amount</label><input class="field" id="fAmt" type="number" min="0" step="any" required placeholder="1000"></div>
+    </div>
+    <div id="tokRow" hidden>
+      <label for="fTokAddr">Token address</label>
+      <input class="field mono" id="fTokAddr" placeholder="0x…" autocomplete="off" spellcheck="false">
+      <p class="hint" id="tokInfo"></p>
+    </div>
+    <label for="fDur">Flows over</label>
+    <div class="row3">
+      <input class="field" id="fDur" type="number" min="1" step="1" value="30" required>
+      <select class="field" id="fUnit" aria-label="Duration unit"><option value="3600">hours</option><option value="86400" selected>days</option><option value="604800">weeks</option><option value="2629800">months</option></select>
+    </div>
+    <label class="check"><input type="checkbox" id="fLater"> Start later instead of now</label>
+    <div id="laterRow" hidden><label for="fStart">Starts at</label><input class="field" id="fStart" type="datetime-local"></div>
+    <label for="fMemo">What it's for (optional)</label>
+    <input class="field" id="fMemo" maxlength="140" placeholder="October retainer">
+    <div class="preview" id="preview">Fill in an amount to see the rate.</div>
+    <div class="steps">
+      <button class="btn" type="button" id="approveBtn" hidden disabled>1. Approve</button>
+      <button class="btn go" type="submit" id="createBtn">Start stream</button>
+    </div>
+  </form>
+</section>
+
+<section class="list-wrap" aria-labelledby="listH">
+  <h2 id="listH" class="sr" style="position:absolute;left:-9999px">Your streams</h2>
+  <div class="tabs" role="group" aria-label="Filter streams">
+    <button class="tab" data-f="in" aria-pressed="true">Incoming</button>
+    <button class="tab" data-f="out" aria-pressed="false">Outgoing</button>
+  </div>
+  <div id="list"><div class="empty">Connect your wallet to see your streams.</div></div>
+</section>
+
+<footer class="foot">
+  <div class="foot-in">
+    <div><p class="foot-label">Built on</p><p class="foot-name">BOT Chain</p></div>
+    <ul class="foot-links">
+      <li>BOT Chain official website: <a href="https://botchain.ai" target="_blank" rel="noopener">https://botchain.ai</a></li>
+      <li>BOT Chain Explorer: <a href="https://scan.botchain.ai" target="_blank" rel="noopener">https://scan.botchain.ai</a></li>
+      <li id="contractLi">Drip contract: <a id="contractLink" class="mono" href="https://scan.botchain.ai" target="_blank" rel="noopener"></a></li>
+    </ul>
+  </div>
+</footer>
+
+<dialog id="walletDlg" aria-labelledby="walletH">
+  <h2 id="walletH">Choose a wallet</h2>
+  <div id="walletList" class="wallets"></div>
+  <p class="hint">Any EVM wallet works. Your wallet will ask to switch to BOT Chain if needed.</p>
+  <div class="steps"><button class="btn quiet" id="walletCancel" type="button">Cancel</button></div>
+</dialog>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+const CONFIG = {
+  contract: "0x7871Ab41736fe76b6030a7e02AB8b78dBdBc4e8c",
+  chainId: 677,
+  chainName: "BOT Chain",
+  explorer: "https://scan.botchain.ai",
+};
+const NATIVE = "0x0000000000000000000000000000000000000000";
+const ABI = [
+  "function feeBps() view returns (uint16)",
+  "function feeFor(uint256) view returns (uint256)",
+  "function getStream(uint256) view returns (tuple(address sender,uint40 start,uint40 end,bool cancelled,address recipient,address token,uint128 deposit,uint128 withdrawn,string memo))",
+  "function withdrawable(uint256) view returns (uint256)",
+  "function streamsBySender(address) view returns (uint256[])",
+  "function streamsByRecipient(address) view returns (uint256[])",
+  "function create(address,address,uint128,uint40,uint40,string) payable returns (uint256)",
+  "function withdraw(uint256)",
+  "function cancel(uint256)",
+];
+const ERC20 = ["function name() view returns (string)","function symbol() view returns (string)","function decimals() view returns (uint8)",
+  "function balanceOf(address) view returns (uint256)","function allowance(address,address) view returns (uint256)","function approve(address,uint256) returns (bool)"];
+
+const S = { browser:null, signer:null, me:null, read:null, write:null, feeBps:25n, filter:"in", streams:[], tok:null, tokCache:new Map() };
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const short = (a) => a ? a.slice(0,6) + "…" + a.slice(-4) : "";
+const same = (a,b) => a && b && a.toLowerCase() === b.toLowerCase();
+const nowS = () => Math.floor(Date.now()/1000);
+function fmt(v, dec, max = 4){ const n = Number(ethers.formatUnits(v, dec)); return n.toLocaleString(undefined,{maximumFractionDigits:max}); }
+function date(ts){ return new Date(ts*1000).toLocaleString(undefined,{month:"short",day:"numeric",year:"numeric",hour:"2-digit",minute:"2-digit"}); }
+let tt;
+function toast(html, ms = 5000){ const t = $("toast"); t.innerHTML = html; t.classList.add("show"); clearTimeout(tt); if (ms) tt = setTimeout(() => t.classList.remove("show"), ms); }
+function errMsg(e){
+  const m = e?.shortMessage || e?.info?.error?.message || e?.message || String(e);
+  if (/user rejected|ACTION_REJECTED/i.test(m)) return "You cancelled the transaction in your wallet.";
+  if (/insufficient funds/i.test(m)) return "Not enough BOT in your wallet for this amount plus gas.";
+  if (/could not coalesce|failed to fetch/i.test(m)) return `Couldn't reach ${CONFIG.chainName}. Check your connection and that your wallet is on ${CONFIG.chainName}.`;
+  const k = { InvalidParams:"Something isn't valid. Check the recipient, amount and dates. Tokens that take a fee on transfer aren't supported.",
+    WrongAmount:"The fee changed. Refresh the page and try again.", NotAuthorized:"Only the sender or recipient can do that.",
+    NothingToWithdraw:"Nothing has flowed yet.", StreamFinished:"This stream has already finished or been stopped.", EnforcedPause:"New streams are paused right now.",
+    ERC20InsufficientAllowance:"Approve the tokens first (step 1).", ERC20InsufficientBalance:"You don't have enough of that token." };
+  for (const x in k) if (m.includes(x)) return k[x];
+  return m.length > 180 ? m.slice(0,180) + "…" : m;
+}
+async function send(label, fn, after){
+  if (!S.write) { toast("Connect your wallet first."); return false; }
+  if (!(await onRightChain())) { toast(`Switch your wallet to ${CONFIG.chainName} first.`); return false; }
+  try {
+    toast(`${label}: confirm in your wallet…`, 0);
+    const tx = await fn();
+    toast(`${label}: waiting for the network… <a href="${CONFIG.explorer}/tx/${tx.hash}" target="_blank" rel="noopener">View</a>`, 0);
+    await tx.wait();
+    if (after) await after();
+    toast(`${label}: done. <a href="${CONFIG.explorer}/tx/${tx.hash}" target="_blank" rel="noopener">View</a>`);
+    return true;
+  } catch (e) { toast(errMsg(e), 8000); return false; }
+}
+
+// ---------------- wallets (EIP-6963) ----------------
+const WALLETS = new Map();
+window.addEventListener("eip6963:announceProvider", (e) => { const { info, provider } = e.detail || {}; if (info?.rdns && provider) WALLETS.set(info.rdns, { info, provider }); });
+window.dispatchEvent(new Event("eip6963:requestProvider"));
+function walletList(){ const l = [...WALLETS.values()]; if (!l.length && window.ethereum) l.push({ info:{ rdns:"injected", name:"Browser wallet", icon:"" }, provider: window.ethereum }); return l; }
+function savedWallet(){ try { return localStorage.getItem("drip_wallet"); } catch (e) { return null; } }
+function saveWallet(r){ try { r ? localStorage.setItem("drip_wallet", r) : localStorage.removeItem("drip_wallet"); } catch (e) {} }
+function pickWallet(){
+  return new Promise((resolve) => {
+    const list = walletList(), dlg = $("walletDlg"), box = $("walletList");
+    box.innerHTML = list.length ? list.map((w,i) => {
+      const icon = /^data:image\/(png|svg\+xml|webp|jpeg);/i.test(w.info.icon || "") ? `<img src="${esc(w.info.icon)}" alt="" width="28" height="28">` : `<span class="wicon" aria-hidden="true"></span>`;
+      return `<button class="wbtn" type="button" data-i="${i}">${icon}<span>${esc(w.info.name || "Wallet")}</span></button>`;
+    }).join("") : `<p class="hint" style="margin:0">No wallet found in this browser. Install an EVM wallet such as MetaMask, Trust Wallet, Rabby, OKX or Coinbase Wallet, or open this page in your mobile wallet's browser.</p>`;
+    const done = (w) => { dlg.close(); resolve(w); };
+    box.onclick = (e) => { const b = e.target.closest("button[data-i]"); if (b) done(list[Number(b.dataset.i)]); };
+    $("walletCancel").onclick = () => done(null);
+    dlg.oncancel = () => resolve(null);
+    dlg.showModal();
+  });
+}
+let activeEth = null;
+function attach(eth){
+  if (activeEth === eth) return;
+  if (activeEth?.removeListener) { activeEth.removeListener("accountsChanged", onAccounts); activeEth.removeListener("chainChanged", onChain); }
+  activeEth = eth; eth.on?.("accountsChanged", onAccounts); eth.on?.("chainChanged", onChain);
+}
+function onAccounts(a){ if (!a || !a.length) { saveWallet(null); location.reload(); } else useWallet(activeEth, false); }
+function onChain(){ location.reload(); }
+async function onRightChain(){ if (!S.browser) return false; return Number((await S.browser.getNetwork()).chainId) === CONFIG.chainId; }
+async function switchChain(eth){
+  const hex = "0x" + CONFIG.chainId.toString(16);
+  try { await eth.request({ method:"wallet_switchEthereumChain", params:[{ chainId: hex }] }); }
+  catch (e) {
+    const code = e?.code ?? e?.data?.originalError?.code;
+    if (code === 4902) toast(`Add ${CONFIG.chainName} (chain ID ${CONFIG.chainId}) to your wallet, then try again.`, 9000);
+    else throw e;
+  }
+}
+async function useWallet(eth, ask = true){
+  try {
+    await eth.request({ method: ask ? "eth_requestAccounts" : "eth_accounts" });
+    attach(eth);
+    S.browser = new ethers.BrowserProvider(eth);
+    if (!(await onRightChain())) await switchChain(eth);
+    S.browser = new ethers.BrowserProvider(eth);
+    S.signer = await S.browser.getSigner();
+    S.me = await S.signer.getAddress();
+    const right = await onRightChain();
+    $("who").innerHTML = right ? `<b>${short(S.me)}</b> on ${CONFIG.chainName}` : `<span class="bad">Wrong network. Switch to ${CONFIG.chainName}.</span>`;
+    $("connect").textContent = "Change wallet"; $("connect").classList.remove("go"); $("connect").classList.add("quiet");
+    if (!CONFIG.contract) { $("list").innerHTML = `<div class="empty">Drip isn't deployed yet. Set the contract address in CONFIG.</div>`; return; }
+    S.write = new ethers.Contract(CONFIG.contract, ABI, S.signer);
+    S.read = new ethers.Contract(CONFIG.contract, ABI, S.browser);
+    S.feeBps = BigInt(await S.read.feeBps());
+    await Promise.all([loadStreams(), loadTok()]);
+    updatePreview();
+  } catch (e) { toast(errMsg(e), 8000); }
+}
+async function connect(){
+  window.dispatchEvent(new Event("eip6963:requestProvider"));
+  await new Promise(r => setTimeout(r, 150));
+  const list = walletList();
+  const w = list.length === 1 && !S.me ? list[0] : await pickWallet();
+  if (!w) return;
+  if (S.me && activeEth === w.provider) await w.provider.request({ method:"wallet_requestPermissions", params:[{ eth_accounts:{} }] }).catch(() => {});
+  saveWallet(w.info.rdns);
+  await useWallet(w.provider, true);
+}
+
+// ---------------- tokens ----------------
+async function tokMeta(addr){
+  if (addr === NATIVE) return { addr, symbol:"BOT", decimals:18, name:"BOT" };
+  const k = addr.toLowerCase();
+  if (!S.tokCache.has(k)) {
+    const c = new ethers.Contract(addr, ERC20, S.browser);
+    const [name, symbol, decimals] = await Promise.all([c.name().catch(() => "Token"), c.symbol().catch(() => "?"), c.decimals().catch(() => 18n)]);
+    S.tokCache.set(k, { addr, name, symbol, decimals: Number(decimals) });
+  }
+  return S.tokCache.get(k);
+}
+function isToken(){ return $("fTok").value === "token"; }
+async function loadTok(){
+  S.tok = null;
+  if (!isToken()) { S.tok = { ...(await tokMeta(NATIVE)), native:true }; updatePreview(); return; }
+  const a = $("fTokAddr").value.trim();
+  if (!ethers.isAddress(a)) { $("tokInfo").textContent = a ? "That isn't a valid address." : ""; updatePreview(); return; }
+  if (!S.me) { $("tokInfo").textContent = "Connect your wallet to continue."; return; }
+  try {
+    const m = await tokMeta(a);
+    const c = new ethers.Contract(a, ERC20, S.browser);
+    const [bal, allow] = await Promise.all([c.balanceOf(S.me), c.allowance(S.me, CONFIG.contract)]);
+    S.tok = { ...m, bal, allow, native:false };
+    $("tokInfo").innerHTML = `<b>${esc(m.name)} (${esc(m.symbol)})</b> · you have ${esc(fmt(bal, m.decimals))} ${esc(m.symbol)}`;
+  } catch (e) { $("tokInfo").textContent = "Couldn't read that token. Check it's an ERC-20 token on BOT Chain."; }
+  updatePreview();
+}
+
+// ---------------- create form ----------------
+function amountWei(){ try { return S.tok ? ethers.parseUnits($("fAmt").value || "0", S.tok.decimals) : 0n; } catch { return -1n; } }
+function times(){
+  const later = $("fLater").checked;
+  const start = later ? Math.floor(new Date($("fStart").value).getTime()/1000) : 0;
+  const dur = Math.round(Number($("fDur").value || 0) * Number($("fUnit").value));
+  const base = later ? start : nowS();
+  return { later, start, dur, end: base + dur };
+}
+function updatePreview(){
+  const a = amountWei(), t = times(), p = $("preview");
+  const tokenMode = isToken();
+  $("approveBtn").hidden = !tokenMode;
+  if (!S.tok || a <= 0n || t.dur <= 0) { p.textContent = "Fill in an amount and duration to see the rate."; $("approveBtn").disabled = true; return; }
+  const fee = (a * S.feeBps) / 10000n, total = a + fee, sym = S.tok.symbol, d = S.tok.decimals;
+  const perDay = Number(ethers.formatUnits(a, d)) / (t.dur / 86400);
+  p.innerHTML = `About <b>${esc(perDay.toLocaleString(undefined,{maximumFractionDigits:4}))} ${esc(sym)}</b> per day. You pay <b>${esc(fmt(total, d))} ${esc(sym)}</b>, including a ${Number(S.feeBps)/100}% fee of ${esc(fmt(fee, d, 6))}. The recipient gets exactly ${esc(fmt(a, d))}.`;
+  if (tokenMode) {
+    const enough = S.tok.allow !== undefined && S.tok.allow >= total;
+    $("approveBtn").disabled = enough || S.tok.bal === undefined || total > S.tok.bal;
+    $("approveBtn").textContent = enough ? "1. Approved" : "1. Approve";
+    $("createBtn").textContent = "2. Start stream";
+  } else $("createBtn").textContent = "Start stream";
+}
+$("fTok").onchange = () => { $("tokRow").hidden = !isToken(); loadTok(); };
+let tokTimer; $("fTokAddr").addEventListener("input", () => { clearTimeout(tokTimer); tokTimer = setTimeout(loadTok, 300); });
+for (const id of ["fAmt","fDur","fUnit","fStart"]) $(id).addEventListener("input", updatePreview);
+$("fLater").onchange = () => { $("laterRow").hidden = !$("fLater").checked; updatePreview(); };
+$("approveBtn").onclick = () => {
+  const a = amountWei(); if (!S.tok || a <= 0n) return;
+  const total = a + (a * S.feeBps) / 10000n;
+  const c = new ethers.Contract(S.tok.addr, ERC20, S.signer);
+  send("Approve", () => c.approve(CONFIG.contract, total), loadTok);
+};
+$("newForm").onsubmit = (e) => {
+  e.preventDefault();
+  if (!S.me) return connect();
+  const to = $("fTo").value.trim();
+  if (!ethers.isAddress(to)) return toast("Enter a valid recipient wallet address.");
+  if (same(to, S.me)) return toast("You can't stream to your own wallet.");
+  const a = amountWei(); if (!S.tok || a <= 0n) return toast("Enter the total amount to stream.");
+  const t = times();
+  if (t.dur <= 0) return toast("Enter how long the stream should run.");
+  if (t.later && (!t.start || t.start <= nowS() + 60)) return toast("Pick a start time in the future, or untick “Start later”.");
+  const fee = (a * S.feeBps) / 10000n;
+  const memo = $("fMemo").value.trim();
+  const tokAddr = S.tok.native ? NATIVE : S.tok.addr;
+  const value = S.tok.native ? a + fee : 0n;
+  send("Start stream", async () => {
+    // For "start now", time the end from the chain's clock, not this computer's, plus the
+    // few seconds until the transaction lands, so the stream runs the full duration.
+    const end = t.later ? t.end : Number((await S.browser.getBlock("latest")).timestamp) + t.dur + 15;
+    return S.write.create(to, tokAddr, a, t.later ? t.start : 0, end, memo, { value });
+  }, async () => {
+    $("newForm").reset(); $("tokRow").hidden = true; $("laterRow").hidden = true; await loadTok();
+    setFilter("out"); await loadStreams();
+  });
+};
+
+// ---------------- streams ----------------
+function setFilter(f){ S.filter = f; document.querySelectorAll(".tab").forEach(x => x.setAttribute("aria-pressed", x.dataset.f === f)); }
+document.querySelectorAll(".tab").forEach(b => b.onclick = () => { setFilter(b.dataset.f); render(); });
+async function loadStreams(){
+  if (!S.read || !S.me) return;
+  try {
+    const [outIds, inIds] = await Promise.all([S.read.streamsBySender(S.me), S.read.streamsByRecipient(S.me)]);
+    const ids = [...new Set([...outIds, ...inIds].map(Number))];
+    S.streams = await Promise.all(ids.map(async id => {
+      const s = (await S.read.getStream(id)).toObject();
+      const tok = await tokMeta(s.token);
+      return { id, ...s, start: Number(s.start), end: Number(s.end), tok };
+    }));
+    render();
+  } catch (e) { $("list").innerHTML = `<div class="empty">Couldn't load your streams: ${esc(errMsg(e))}</div>`; }
+}
+function flowed(s, t){ if (t >= s.end) return s.deposit; if (t <= s.start) return 0n; return (s.deposit * BigInt(Math.floor((t - s.start) * 1000))) / BigInt((s.end - s.start) * 1000); }
+function statusOf(s){ const t = nowS(); if (s.cancelled) return "Stopped"; if (t < s.start) return "Scheduled"; if (t >= s.end) return "Finished"; return "Flowing"; }
+function render(){
+  const out = S.filter === "out";
+  const list = S.streams.filter(s => out ? same(s.sender, S.me) : same(s.recipient, S.me)).sort((a,b) => b.id - a.id);
+  if (!list.length) { $("list").innerHTML = `<div class="empty">${out ? "You haven't started any streams yet. Use the form above." : "Nobody is streaming to you yet. Share your wallet address with whoever is paying you."}</div>`; return; }
+  $("list").innerHTML = `<div class="grid">${list.map(s => {
+    const st = statusOf(s), d = s.tok.decimals, sym = esc(s.tok.symbol);
+    const other = out ? s.recipient : s.sender;
+    const rate = Number(ethers.formatUnits(s.deposit, d)) / Math.max(1,(s.end - s.start)) * 86400;
+    const canWithdraw = !out && s.withdrawn < s.deposit && nowS() > s.start;
+    const canCancel = !s.cancelled && nowS() < s.end;
+    return `<article class="stream ${st === "Flowing" ? "live" : ""}" data-id="${s.id}">
+      <span class="badge ${st === "Flowing" ? "live" : ""}">${st}</span>
+      <div class="dir">${out ? "To" : "From"} <b><a href="${CONFIG.explorer}/address/${esc(other)}" target="_blank" rel="noopener">${short(other)}</a></b></div>
+      ${s.memo ? `<div class="memo">${esc(s.memo)}</div>` : ""}
+      <div class="counter" data-c="${s.id}">0<small>${sym}</small></div>
+      <div class="of">streamed of ${esc(fmt(s.deposit, d))} ${sym}${s.cancelled ? " (after stopping)" : ""}</div>
+      <div class="bar"><i data-b="${s.id}"></i></div>
+      <div class="meta"><span><b>${esc(rate.toLocaleString(undefined,{maximumFractionDigits:4}))}</b> ${sym}/day</span><span>${esc(date(s.start))} → ${esc(date(s.end))}</span><span>${esc(fmt(s.withdrawn, d))} withdrawn</span></div>
+      <div class="acts">
+        ${canWithdraw ? `<button class="btn go" data-a="withdraw">Withdraw</button>` : ""}
+        ${canCancel ? `<button class="btn warn" data-a="cancel">Stop stream</button>` : ""}
+      </div>
+    </article>`;
+  }).join("")}</div>`;
+  tick();
+}
+function tick(){
+  const t = Date.now() / 1000;
+  for (const s of S.streams) {
+    const el = document.querySelector(`[data-c="${s.id}"]`); if (!el) continue;
+    const f = flowed(s, t), d = s.tok.decimals;
+    const n = Number(ethers.formatUnits(f, d));
+    const digits = n >= 1000 ? 4 : 6;
+    el.firstChild.nodeValue = n.toLocaleString(undefined,{minimumFractionDigits:digits,maximumFractionDigits:digits});
+    const pct = s.deposit > 0n ? Number((f * 10000n) / s.deposit) / 100 : 0;
+    const b = document.querySelector(`[data-b="${s.id}"]`); if (b) b.style.width = pct + "%";
+  }
+}
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+setInterval(tick, reduce ? 1000 : 100);
+$("list").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-a]"); if (!b) return;
+  const id = Number(b.closest(".stream").dataset.id), a = b.dataset.a;
+  if (a === "withdraw") send("Withdraw", () => S.write.withdraw(id), loadStreams);
+  if (a === "cancel" && confirm("Stop this stream? The recipient keeps what has already flowed, and the rest goes back to the sender.")) send("Stop stream", () => S.write.cancel(id), loadStreams);
+});
+
+// ---------------- boot ----------------
+$("connect").onclick = connect;
+(async function boot(){
+  if (CONFIG.contract) { $("contractLink").textContent = short(CONFIG.contract); $("contractLink").href = `${CONFIG.explorer}/address/${CONFIG.contract}`; }
+  else $("contractLi").hidden = true;
+  S.tok = { addr: NATIVE, symbol:"BOT", decimals:18, native:true };
+  updatePreview();
+  const saved = savedWallet();
+  if (saved) {
+    await new Promise(r => setTimeout(r, 200));
+    const w = walletList().find(x => x.info.rdns === saved);
+    if (w) { const a = await w.provider.request({ method:"eth_accounts" }).catch(() => []); if (a.length) return useWallet(w.provider, false); }
+  }
+})();
+</script>
+</body>
+</html>
